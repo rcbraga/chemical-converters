@@ -64,7 +64,9 @@ class NamesConverter:
             ValueError: If the specified model is not available.
         """
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        self.model = MT5ForConditionalGeneration.from_pretrained(model_name).to(device)
+        self.model = MT5ForConditionalGeneration.from_pretrained(model_name)
+        self.model.config.use_cache = True  # Garante que o cache está ativado
+        self.model = self.model.to(device)
         self.smiles_tokenizer = AutoTokenizer.from_pretrained("knowledgator/SMILES-FAST-TOKENIZER")
         self.iupac_tokenizer = AutoTokenizer.from_pretrained("knowledgator/IUPAC-FAST-TOKENIZER")
         self.smiles_max_len = smiles_max_len

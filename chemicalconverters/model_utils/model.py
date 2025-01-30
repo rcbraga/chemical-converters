@@ -30,7 +30,8 @@ from transformers.utils import (
 )
 
 from transformers.utils.model_parallel_utils import assert_device_map, get_device_map
-
+from transformers.generation.utils import GenerationMixin
+from transformers.cache_utils import EncoderDecoderCache, DynamicCache
 import torch
 from torch import nn
 from torch.nn import CrossEntropyLoss
@@ -51,7 +52,7 @@ _CONFIG_FOR_DOC = "MT5Config"
 _CHECKPOINT_FOR_DOC = "mt5-small"
 
 @add_start_docstrings("""MT5 Model with a `language model_utils` head on top.""", MT5_START_DOCSTRING)
-class MT5ForConditionalGeneration(MT5PreTrainedModel):
+class MT5ForConditionalGeneration(MT5PreTrainedModel, GenerationMixin):
     r"""
     Examples:
 
@@ -324,6 +325,8 @@ class MT5ForConditionalGeneration(MT5PreTrainedModel):
         )
 
     # Copied from transformers.models.t5.modeling_t5.T5ForConditionalGeneration.prepare_inputs_for_generation
+   
+
     def prepare_inputs_for_generation(
         self,
         input_ids,
@@ -337,18 +340,13 @@ class MT5ForConditionalGeneration(MT5PreTrainedModel):
         encoder_outputs=None,
         **kwargs,
     ):
-        # cut decoder_input_ids if past_key_values is used
-        if past_key_values is not None:
-            past_length = past_key_values[0][0].shape[2]
+        # Se `past_key_values` estiver no formato antigo, converta para `EncoderDecoderCache`
+        if past_key_values is not None and not isinstance(past_key_values, EncoderDecoderCache):
+            past_key_values = EncoderDecoderCache.from_legacy_cache(past_key_values)
 
-            # Some generation methods already pass only the last input ID
-            if input_ids.shape[1] > past_length:
-                remove_prefix_length = past_length
-            else:
-                # Default to old behavior: keep only final ID
-                remove_prefix_length = input_ids.shape[1] - 1
-
-            input_ids = input_ids[:, remove_prefix_length:]
+        # Se `past_key_values` for None, inicializa com um cache vazio
+        if past_key_values is None:
+            past_key_values = EncoderDecoderCache(DynamicCache(), DynamicCache())
 
         return {
             "decoder_input_ids": input_ids,
